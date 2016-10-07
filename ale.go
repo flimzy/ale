@@ -9,20 +9,17 @@ import (
 	"github.com/tylerb/graceful"
 )
 
-// Context is a clone of the context.Context interface, for convenience
-type Context interface {
-	Deadline() (time.Time, bool)
-	Done() <-chan struct{}
-	Err() error
-	Value(interface{}) interface{}
-}
-
 // Logger is an interface to a minimal logger, such as the default *log.Logger, or my
 // preferred github.com/flimzy/log.Logger.
 type Logger interface {
 	Print(...interface{})
 	Printf(string, ...interface{})
 	Println(...interface{})
+}
+
+// RouteOptions provides route-specific configuration
+type RouteOptions struct {
+	Template string
 }
 
 // Debugger is an interface to a debugger, such as github.com/flimzy/log.Logger
@@ -52,6 +49,7 @@ type Server struct {
 // New returns a new Ale server instance.
 func New() *Server {
 	s := &Server{
+		Timeout: Timeout,
 		Context: context.Background(),
 		router:  httprouter.New(),
 	}
