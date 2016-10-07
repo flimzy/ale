@@ -5,8 +5,8 @@ import (
 	"html/template"
 	"time"
 
+	"github.com/dimfeld/httptreemux"
 	"github.com/flimzy/log"
-	"github.com/julienschmidt/httprouter"
 	"github.com/tylerb/graceful"
 )
 
@@ -33,7 +33,7 @@ type Server struct {
 	// View is the default View configuration
 	View        *View
 	templates   map[string]*template.Template
-	router      *httprouter.Router
+	router      *httptreemux.TreeMux
 	httpServer  *graceful.Server
 	httpsServer *graceful.Server
 	envPrefix   string
@@ -45,7 +45,7 @@ func New() *Server {
 	s := &Server{
 		Timeout: Timeout,
 		Context: context.Background(),
-		router:  httprouter.New(),
+		router:  httptreemux.New(),
 	}
 	return s
 }

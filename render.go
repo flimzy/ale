@@ -64,8 +64,7 @@ func (s *Server) Render(w ResponseWriter, r *http.Request) {
 	if w.Written() {
 		return
 	}
-	ctx := r.Context()
-	stash, _ := ctx.Value("stash").(map[string]interface{})
+	stash := Stash(r)
 	viewName, _ := stash["view"].(string)
 	if viewName == "" {
 		w.WriteHeader(http.StatusInternalServerError)

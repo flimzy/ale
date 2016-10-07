@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-
-	"github.com/julienschmidt/httprouter"
 )
 
 // ResponseWriter is Ale's custom version of http.ResponseWriter
@@ -63,17 +61,17 @@ func (s *Server) Handle(method, pattern string, h http.Handler, v ...View) {
 		}
 	}
 	fmt.Printf("aggregate view = %v\n", view)
-	s.router.Handle(method, pattern, func(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	s.router.Handle(method, pattern, func(rw http.ResponseWriter, req *http.Request, p map[string]string) {
 		stash := map[string]interface{}{
-			"params":   p,
 			"view":     view.View,
 			"template": view.Template,
 		}
-		ctx := context.WithValue(s.Context, "stash", stash)
+		ctx := context.WithValue(s.Context, StashContextKey, stash)
+		ctx = context.WithValue(ctx, ParamsContextKey, p)
 		w := &response{rw, false}
-		rctx := r.WithContext(ctx)
-		h.ServeHTTP(w, rctx)
-		s.Render(w, rctx)
+		r := req.WithContext(ctx)
+		h.ServeHTTP(w, r)
+		s.Render(w, r)
 	})
 }
 
@@ -84,5 +82,5 @@ func (s *Server) Get(pattern string, h http.Handler, v ...View) {
 
 // ServeFiles is a wrapper around httprouter.ServeFiles
 func (s *Server) ServeFiles(path string, root http.FileSystem) {
-	s.router.ServeFiles(path, root)
+	s.Get(path, http.FileServer(root))
 }
