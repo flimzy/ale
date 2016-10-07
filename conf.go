@@ -1,9 +1,14 @@
 package ale
 
 import (
+	"os"
+
 	"github.com/flimzy/log"
-	"github.com/spf13/viper"
 )
+
+var defaults = map[string]string{
+	"HTTP_BIND": ":8080",
+}
 
 const (
 	// ConfHTTPBind is the config key for the HTTP bind address
@@ -16,33 +21,22 @@ const (
 	ConfSSLKey = "SSL_KEY"
 )
 
-// Viper is an alias for viper.Viper
-type Viper viper.Viper
-
-func (s *Server) setConfDefaults() {
-	log.Debug("Setting config defaults")
-	s.viper.SetDefault("HTTP_BIND", ":8080")
-	s.viper.BindEnv("HTTP_BIND")
-}
-
 // SetEnvPrefix sets the environment prefix for configuration
 func (s *Server) SetEnvPrefix(prefix string) {
 	log.Debugf("Setting ENV prefix to '%s'", prefix)
 	s.envPrefix = prefix
-	s.viper.SetEnvPrefix(prefix)
 }
 
-// SetConf sets the supplied configuration variable
-func (s *Server) SetConf(key, value string) {
-	s.viper.Set(key, value)
+// EnvPrefix returns the currently configured ENV prefix
+func (s *Server) EnvPrefix() string {
+	return s.envPrefix
 }
 
 // GetConf retrieves the requested configuration variable
-func (s *Server) GetConf(key string) string {
-	value := s.viper.Get(key)
-	log.Debugf("GetConf() %s = %s", key, value)
-	if value == nil {
-		return ""
+func (s *Server) GetConf(key string) (val string) {
+	val, _ = defaults[key] // Set default, if there is one
+	if s.envPrefix != "" {
+		return os.Getenv(s.envPrefix + "_" + key)
 	}
-	return value.(string)
+	return os.Getenv(key)
 }

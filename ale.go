@@ -5,7 +5,6 @@ import (
 
 	"github.com/flimzy/log"
 	"github.com/julienschmidt/httprouter"
-	"github.com/spf13/viper"
 	"github.com/tylerb/graceful"
 )
 
@@ -36,14 +35,12 @@ type Server struct {
 	httpServer  *graceful.Server
 	httpsServer *graceful.Server
 	envPrefix   string
-	viper       *viper.Viper
 	err         error
 }
 
 // New returns a new Ale server instance.
 func New() *Server {
 	s := &Server{
-		viper:  viper.New(),
 		Router: httprouter.New(),
 	}
 	return s
@@ -51,7 +48,6 @@ func New() *Server {
 
 // Run initializes the web server instance
 func (s *Server) Run() error {
-	s.setConfDefaults()
 	httpAddr := s.GetConf(ConfHTTPBind)
 	httpsAddr := s.GetConf(ConfHTTPSBind)
 
