@@ -1,39 +1,100 @@
 package ale
 
 import (
-	"context"
+	"bytes"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"os"
+
+	"github.com/flimzy/log"
+	"github.com/oxtoacart/bpool"
+	"github.com/pkg/errors"
 )
 
-var tmpl = template.New("main")
+// BufPoolSize is the size of the BufferPool.
+var BufPoolSize = 32
 
-func init() {
-	_, err := tmpl.ParseGlob("html/*")
-	if err != nil {
-		log.Printf("Error parsing templates: %s\n", err)
-		os.Exit(1)
+// BufPoolAlloc is the maximum size of each buffer.
+var BufPoolAlloc = 10 * 1024
+
+var bufpool *bpool.SizedBufferPool
+
+func initBufPool() {
+	bufpool = bpool.NewSizedBufferPool(BufPoolSize, BufPoolAlloc)
+}
+
+func getBuf() *bytes.Buffer {
+	if bufpool == nil {
+		initBufPool()
 	}
+	return bufpool.Get()
+}
+
+func putBuf(b *bytes.Buffer) {
+	bufpool.Put(b)
+}
+
+func (s *Server) template(name string) (*template.Template, error) {
+	if s.TemplateDir == "" {
+		return nil, errors.Errorf("No TemplateDir specified")
+	}
+	tmplFile := s.TemplateDir + "/" + name
+	if _, err := os.Stat(tmplFile); err != nil {
+		return nil, errors.Wrapf(err, "Unable to read requested template `%s'", tmplFile)
+	}
+	t, err := template.ParseFiles(tmplFile)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Unable to parse template '%s'", tmplFile)
+	}
+	libPath := s.TemplateDir + "/lib"
+	if _, err := os.Stat(libPath); err != nil && !os.IsNotExist(err) {
+		return nil, errors.Wrapf(err, "Unable to read templates lib `%s`", libPath)
+	} else if err == nil {
+		_, err := t.ParseGlob(libPath + "/*")
+		if err != nil {
+			return nil, errors.Wrapf(err, "Error parsing templates in '%s'", libPath)
+		}
+	}
+	return t, nil
 }
 
 // Render renders the page
-func (s *Server) Render(ctx context.Context, w ResponseWriter, r *http.Request) {
+func (s *Server) Render(w ResponseWriter, r *http.Request) {
 	if w.Written() {
 		return
 	}
-	var template string
-	if val := ctx.Value("template"); val != nil {
-		template = val.(string)
-	}
-	//	fmt.Fprintf(w, "Found these templates: %s", tmpl.DefinedTemplates())
-	if t := tmpl.Lookup(template); t != nil {
-		t.Execute(w, ctx)
+	ctx := r.Context()
+	stash, _ := ctx.Value("stash").(map[string]interface{})
+	viewName, _ := stash["view"].(string)
+	if viewName == "" {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "No view defined for %s.\n", r.URL.Path)
 		return
 	}
-	fmt.Fprint(w, "Hello world!\n")
-	fmt.Fprintf(w, "Requested asset = %s\n", r.URL.Path)
-	fmt.Fprintf(w, "Requested template = %s\n", template)
+	tmplName, _ := stash["template"].(string)
+	if tmplName == "" {
+		tmplName = viewName
+	}
+	log.Debugf("viewName = %s, tmplName = %s\n", viewName, tmplName)
+	if err := s.renderTemplate(w, viewName, tmplName, stash); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error executing template: %s\n", err)
+	}
+}
+
+func (s *Server) renderTemplate(w ResponseWriter, view, tmpl string, stash map[string]interface{}) error {
+	t, err := s.template(view)
+	if err != nil {
+		return err
+	}
+	buf := getBuf()
+	defer putBuf(buf)
+	log.Debugf("view = %s, tmpl = %s\n", view, tmpl)
+	if err := t.ExecuteTemplate(buf, tmpl, stash); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	buf.WriteTo(w)
+	return nil
 }

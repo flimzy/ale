@@ -2,6 +2,7 @@ package ale
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
@@ -42,30 +43,43 @@ func (r *response) Written() bool {
 	return r.wrote
 }
 
-// The Controller type is an adapter to allow the use of ordinary functions as HTTP handlers.
-type Controller func(Context, http.ResponseWriter, *http.Request) Context
-
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
 // Handle registers a new Controller with the given method and path.
-func (s *Server) Handle(method, pattern string, c Controller, o ...RouteOptions) {
-	s.router.Handle(method, pattern, func(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		ctx := context.WithValue(s.Context, "params", p)
-		for _, opts := range o {
-			if opts.Template != "" {
-				ctx = context.WithValue(ctx, "template", opts.Template)
-			}
+func (s *Server) Handle(method, pattern string, h http.Handler, v ...View) {
+	view := &View{}
+	if s.View != nil {
+		view.View = s.View.View
+		view.Template = s.View.Template
+	}
+	for _, vv := range v {
+		if vv.View != "" {
+			view.View = vv.View
 		}
+		if vv.Template != "" {
+			view.Template = vv.Template
+		}
+	}
+	fmt.Printf("aggregate view = %v\n", view)
+	s.router.Handle(method, pattern, func(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		stash := map[string]interface{}{
+			"params":   p,
+			"view":     view.View,
+			"template": view.Template,
+		}
+		ctx := context.WithValue(s.Context, "stash", stash)
 		w := &response{rw, false}
-		s.Render(c(ctx, w, r), w, r)
+		rctx := r.WithContext(ctx)
+		h.ServeHTTP(w, rctx)
+		s.Render(w, rctx)
 	})
 }
 
 // Get is a shortcut for Handle("GET", pattern, c)
-func (s *Server) Get(pattern string, c Controller, o ...RouteOptions) {
-	s.Handle("GET", pattern, c, o...)
+func (s *Server) Get(pattern string, h http.Handler, v ...View) {
+	s.Handle("GET", pattern, h, v...)
 }
 
 // ServeFiles is a wrapper around httprouter.ServeFiles

@@ -2,6 +2,7 @@ package ale
 
 import (
 	"context"
+	"html/template"
 	"time"
 
 	"github.com/flimzy/log"
@@ -9,24 +10,10 @@ import (
 	"github.com/tylerb/graceful"
 )
 
-// Logger is an interface to a minimal logger, such as the default *log.Logger, or my
-// preferred github.com/flimzy/log.Logger.
-type Logger interface {
-	Print(...interface{})
-	Printf(string, ...interface{})
-	Println(...interface{})
-}
-
-// RouteOptions provides route-specific configuration
-type RouteOptions struct {
+// View provides view configuration options
+type View struct {
+	View     string
 	Template string
-}
-
-// Debugger is an interface to a debugger, such as github.com/flimzy/log.Logger
-type Debugger interface {
-	Debug(...interface{})
-	Debugf(string, ...interface{})
-	Debugln(...interface{})
 }
 
 // Timeout defines the default time to wait before killing active connections on shutdown or restart.
@@ -36,10 +23,17 @@ const Timeout = 10 * time.Second
 type Server struct {
 	// Timeout is the duration to wait before killing active requests when stopping the server
 	Timeout time.Duration
-	// router is an instance of julienschmidt/httprouter
-	router *httprouter.Router
 	// Context is the master context for this server instance
-	Context     Context
+	Context Context
+	// TemplateDir is the name of the path which contains the HTML templates.
+	// If this path contains a subdir 'lib/', any files contianed within lib
+	// are also loaded into each template. This is where shared components
+	// should generally go.
+	TemplateDir string
+	// View is the default View configuration
+	View        *View
+	templates   map[string]*template.Template
+	router      *httprouter.Router
 	httpServer  *graceful.Server
 	httpsServer *graceful.Server
 	envPrefix   string
