@@ -1,12 +1,21 @@
 package ale
 
 import (
+	"context"
 	"time"
 
 	"github.com/flimzy/log"
 	"github.com/julienschmidt/httprouter"
 	"github.com/tylerb/graceful"
 )
+
+// Context is a clone of the context.Context interface, for convenience
+type Context interface {
+	Deadline() (time.Time, bool)
+	Done() <-chan struct{}
+	Err() error
+	Value(interface{}) interface{}
+}
 
 // Logger is an interface to a minimal logger, such as the default *log.Logger, or my
 // preferred github.com/flimzy/log.Logger.
@@ -30,8 +39,10 @@ const Timeout = 10 * time.Second
 type Server struct {
 	// Timeout is the duration to wait before killing active requests when stopping the server
 	Timeout time.Duration
-	// Router is an instance of julienschmidt/httprouter
-	Router      *httprouter.Router
+	// router is an instance of julienschmidt/httprouter
+	router *httprouter.Router
+	// Context is the master context for this server instance
+	Context     Context
 	httpServer  *graceful.Server
 	httpsServer *graceful.Server
 	envPrefix   string
@@ -41,7 +52,8 @@ type Server struct {
 // New returns a new Ale server instance.
 func New() *Server {
 	s := &Server{
-		Router: httprouter.New(),
+		Context: context.Background(),
+		router:  httprouter.New(),
 	}
 	return s
 }

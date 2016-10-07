@@ -18,7 +18,7 @@ func (s *Server) serveHTTPS(addr string) error {
 	s.httpsServer = &graceful.Server{
 		Server: &http.Server{
 			Addr:    addr,
-			Handler: handlers.LoggingHandler(os.Stderr, s.Router),
+			Handler: handlers.LoggingHandler(os.Stderr, s),
 		},
 		Timeout: s.Timeout,
 		ShutdownInitiated: func() {
@@ -30,7 +30,7 @@ func (s *Server) serveHTTPS(addr string) error {
 
 // BindHTTP binds to the HTTP port or returns an error
 func (s *Server) serveHTTP(addr string) error {
-	return s.serveHTTPToHandler(addr, s.Router)
+	return s.serveHTTPToHandler(addr, s)
 }
 
 func (s *Server) serveHTTPToHandler(addr string, h http.Handler) error {
