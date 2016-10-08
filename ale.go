@@ -14,6 +14,7 @@ import (
 type View struct {
 	View     string
 	Template string
+	FuncMap  map[string]interface{}
 }
 
 // Timeout defines the default time to wait before killing active connections on shutdown or restart.
@@ -34,6 +35,7 @@ type Server struct {
 	View        *View
 	templates   map[string]*template.Template
 	router      *httptreemux.TreeMux
+	Router      *httptreemux.ContextGroup
 	httpServer  *graceful.Server
 	httpsServer *graceful.Server
 	envPrefix   string
@@ -42,10 +44,12 @@ type Server struct {
 
 // New returns a new Ale server instance.
 func New() *Server {
+	router := httptreemux.New()
 	s := &Server{
 		Timeout: Timeout,
 		Context: context.Background(),
-		router:  httptreemux.New(),
+		router:  router,
+		Router:  router.UsingContext(),
 	}
 	return s
 }

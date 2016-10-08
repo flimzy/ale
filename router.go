@@ -2,7 +2,6 @@ package ale
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 )
 
@@ -41,46 +40,19 @@ func (r *response) Written() bool {
 	return r.wrote
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	stash := make(map[string]interface{})
+	stash["view"] = s.View.View
+	stash["template"] = s.View.Template
+	ctx := context.WithValue(s.Context, StashContextKey, stash)
+
+	r := req.WithContext(ctx)
+	w := &response{rw, false}
 	s.router.ServeHTTP(w, r)
-}
-
-// Handle registers a new Controller with the given method and path.
-func (s *Server) Handle(method, pattern string, h http.Handler, v ...View) {
-	view := &View{}
-	if s.View != nil {
-		view.View = s.View.View
-		view.Template = s.View.Template
-	}
-	for _, vv := range v {
-		if vv.View != "" {
-			view.View = vv.View
-		}
-		if vv.Template != "" {
-			view.Template = vv.Template
-		}
-	}
-	fmt.Printf("aggregate view = %v\n", view)
-	s.router.Handle(method, pattern, func(rw http.ResponseWriter, req *http.Request, p map[string]string) {
-		stash := map[string]interface{}{
-			"view":     view.View,
-			"template": view.Template,
-		}
-		ctx := context.WithValue(s.Context, StashContextKey, stash)
-		ctx = context.WithValue(ctx, ParamsContextKey, p)
-		w := &response{rw, false}
-		r := req.WithContext(ctx)
-		h.ServeHTTP(w, r)
-		s.Render(w, r)
-	})
-}
-
-// Get is a shortcut for Handle("GET", pattern, c)
-func (s *Server) Get(pattern string, h http.Handler, v ...View) {
-	s.Handle("GET", pattern, h, v...)
+	s.Render(w, r)
 }
 
 // ServeFiles is a wrapper around httprouter.ServeFiles
 func (s *Server) ServeFiles(path string, root http.FileSystem) {
-	s.Get(path, http.FileServer(root))
+	s.Router.GET(path, http.FileServer(root).ServeHTTP)
 }
