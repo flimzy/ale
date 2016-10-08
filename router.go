@@ -66,5 +66,15 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // ServeFiles is a wrapper around httprouter.ServeFiles
 func (s *Server) ServeFiles(path string, root http.FileSystem) {
-	s.Router.GET(path, http.FileServer(root).ServeHTTP)
+	if len(path) < 10 || path[len(path)-10:] != "/*filepath" {
+		panic("path must end with /*filepath in path '" + path + "'")
+	}
+
+	fileServer := http.FileServer(root)
+
+	s.Router.GET(path, func(w http.ResponseWriter, req *http.Request) {
+		params := GetParams(req)
+		req.URL.Path = params["filepath"]
+		fileServer.ServeHTTP(w, req)
+	})
 }
