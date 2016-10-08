@@ -41,10 +41,22 @@ func (r *response) Written() bool {
 }
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	ctx := s.Context
+	ip, err := ExtractClientIP(req)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+	ctx = context.WithValue(ctx, ClientIPContextKey, ip)
+
 	stash := make(map[string]interface{})
 	stash["view"] = s.View.View
 	stash["template"] = s.View.Template
-	ctx := context.WithValue(s.Context, StashContextKey, stash)
+	ctx = context.WithValue(ctx, StashContextKey, stash)
+
+	view := &View{}
+	*view = *s.View // make a copy
+	ctx = context.WithValue(ctx, ViewContextKey, view)
 
 	r := req.WithContext(ctx)
 	w := &response{rw, false}
