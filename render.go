@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/flimzy/log"
 	"github.com/oxtoacart/bpool"
 	"github.com/pkg/errors"
 )
@@ -43,7 +42,11 @@ func (s *Server) template(name string) (*template.Template, error) {
 	if _, err := os.Stat(tmplFile); err != nil {
 		return nil, errors.Wrapf(err, "Unable to read requested template `%s'", tmplFile)
 	}
-	t, err := template.ParseFiles(tmplFile)
+	t := template.New("")
+	if s.View.FuncMap != nil {
+		t = t.Funcs(s.View.FuncMap)
+	}
+	_, err := t.ParseFiles(tmplFile)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Unable to parse template '%s'", tmplFile)
 	}
@@ -64,33 +67,33 @@ func (s *Server) Render(w ResponseWriter, r *http.Request) {
 	if w.Written() {
 		return
 	}
-	stash := Stash(r)
-	viewName, _ := stash["view"].(string)
-	if viewName == "" {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "No view defined for %s.\n", r.URL.Path)
-		return
-	}
-	tmplName, _ := stash["template"].(string)
-	if tmplName == "" {
-		tmplName = viewName
-	}
-	log.Debugf("viewName = %s, tmplName = %s\n", viewName, tmplName)
-	if err := s.renderTemplate(w, viewName, tmplName, stash); err != nil {
+	if err := s.renderTemplate(w, r); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Error executing template: %s\n", err)
 	}
 }
 
-func (s *Server) renderTemplate(w ResponseWriter, view, tmpl string, stash map[string]interface{}) error {
-	t, err := s.template(view)
+func (s *Server) renderTemplate(w ResponseWriter, r *http.Request) error {
+	view := GetView(r)
+	viewName := view.View
+	if viewName == "" {
+		return errors.Errorf("No view defined for %s", r.URL.Path)
+	}
+	tmplName := view.Template
+	if tmplName == "" {
+		tmplName = viewName
+	}
+
+	t, err := s.template(viewName)
 	if err != nil {
 		return err
 	}
+	if view.FuncMap != nil {
+		t.Funcs(view.FuncMap)
+	}
 	buf := getBuf()
 	defer putBuf(buf)
-	log.Debugf("view = %s, tmpl = %s\n", view, tmpl)
-	if err := t.ExecuteTemplate(buf, tmpl, stash); err != nil {
+	if err := t.ExecuteTemplate(buf, tmplName, GetStash(r)); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
