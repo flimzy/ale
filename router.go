@@ -52,6 +52,7 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	stash := make(map[string]interface{})
 	stash["view"] = s.View.View
 	stash["template"] = s.View.Template
+	stash["req"] = req
 	ctx = context.WithValue(ctx, StashContextKey, stash)
 
 	view := &View{}
