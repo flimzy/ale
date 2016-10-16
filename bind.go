@@ -39,7 +39,7 @@ func (s *Server) serveHTTP(addr string) error {
 
 func (s *Server) serveHTTPToHandler(addr string, h http.Handler) error {
 	log.Printf("Binding HTTP to %s", addr)
-	s.httpsServer = s.mainHandler(addr, func() { log.Printf("Shutting down HTTP service") })
+	s.httpServer = s.mainHandler(addr, func() { log.Printf("Shutting down HTTP service") })
 	return s.httpServer.ListenAndServe()
 }
 
