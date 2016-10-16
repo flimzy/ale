@@ -4,11 +4,9 @@ import (
 	"net"
 	"net/http"
 	"net/http/fcgi"
-	"os"
 	"sync"
 
 	"github.com/flimzy/log"
-	"github.com/gorilla/handlers"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/tylerb/graceful"
@@ -18,7 +16,7 @@ func (s *Server) mainHandler(addr string, shutdown func()) *graceful.Server {
 	return &graceful.Server{
 		Server: &http.Server{
 			Addr:    addr,
-			Handler: handlers.LoggingHandler(os.Stderr, s),
+			Handler: s.logging(s.compress(s)),
 		},
 		Timeout:           s.Timeout,
 		ShutdownInitiated: shutdown,
@@ -49,7 +47,7 @@ func (s *Server) serveFastCGI(addr string) error {
 	if err != nil {
 		return errors.Wrap(err, "Unable to find to FCGI bind point")
 	}
-	return fcgi.Serve(listener, handlers.LoggingHandler(os.Stderr, s))
+	return fcgi.Serve(listener, s.logging(s.compress(s)))
 	//	s.httpsServer = s.mainHandler(addr, func() { log.Printf("Shutting down FastCGI service") })
 	//	return s.httpsServer.Serve(listener)
 }

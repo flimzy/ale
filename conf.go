@@ -21,6 +21,11 @@ const (
 	ConfSSLKey = "SSL_KEY"
 	// ConfFCGIBind will enable FastCGI mode if set to a bind address
 	ConfFCGIBind = "FASTCGI_BIND"
+	// ConfNoLog will disable logging to stdout
+	ConfNoLog = "NOLOG"
+	// ConfNoCompress will disable opportunistic compression. Useful if you're
+	// behind a reverse proxy that does compression for you.
+	ConfNoCompress = "NOCOMPRESS"
 )
 
 // SetEnvPrefix sets the environment prefix for configuration
