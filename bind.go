@@ -1,7 +1,9 @@
 package ale
 
 import (
+	"net"
 	"net/http"
+	"net/http/fcgi"
 	"os"
 	"sync"
 
@@ -12,19 +14,21 @@ import (
 	"github.com/tylerb/graceful"
 )
 
-// bindHTTPS binds to the HTTPS port or returns an error
-func (s *Server) serveHTTPS(addr string) error {
-	log.Printf("Binding HTTPS to %s", addr)
-	s.httpsServer = &graceful.Server{
+func (s *Server) mainHandler(addr string, shutdown func()) *graceful.Server {
+	return &graceful.Server{
 		Server: &http.Server{
 			Addr:    addr,
 			Handler: handlers.LoggingHandler(os.Stderr, s),
 		},
-		Timeout: s.Timeout,
-		ShutdownInitiated: func() {
-			log.Printf("Shutting down HTTPS service")
-		},
+		Timeout:           s.Timeout,
+		ShutdownInitiated: shutdown,
 	}
+}
+
+// bindHTTPS binds to the HTTPS port or returns an error
+func (s *Server) serveHTTPS(addr string) error {
+	log.Printf("Binding HTTPS to %s", addr)
+	s.httpsServer = s.mainHandler(addr, func() { log.Printf("Shutting down HTTPS service") })
 	return s.httpsServer.ListenAndServeTLS(s.GetConf(ConfSSLCert), s.GetConf(ConfSSLKey))
 }
 
@@ -35,17 +39,19 @@ func (s *Server) serveHTTP(addr string) error {
 
 func (s *Server) serveHTTPToHandler(addr string, h http.Handler) error {
 	log.Printf("Binding HTTP to %s", addr)
-	s.httpServer = &graceful.Server{
-		Server: &http.Server{
-			Addr:    addr,
-			Handler: handlers.LoggingHandler(os.Stderr, h),
-		},
-		Timeout: s.Timeout,
-		ShutdownInitiated: func() {
-			log.Printf("Shutting down HTTP service")
-		},
-	}
+	s.httpsServer = s.mainHandler(addr, func() { log.Printf("Shutting down HTTP service") })
 	return s.httpServer.ListenAndServe()
+}
+
+func (s *Server) serveFastCGI(addr string) error {
+	log.Printf("Binding FastCGI to %s", addr)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return errors.Wrap(err, "Unable to find to FCGI bind point")
+	}
+	return fcgi.Serve(listener, handlers.LoggingHandler(os.Stderr, s))
+	//	s.httpsServer = s.mainHandler(addr, func() { log.Printf("Shutting down FastCGI service") })
+	//	return s.httpsServer.Serve(listener)
 }
 
 // serveBoth binds to the HTTP and HTTPS ports, redirecting all HTTP requests to HTTPS

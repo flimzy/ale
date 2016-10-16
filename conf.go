@@ -19,6 +19,8 @@ const (
 	ConfSSLCert = "SSL_CERT"
 	// ConfSSLKey is the config key for the SSL Key location
 	ConfSSLKey = "SSL_KEY"
+	// ConfFCGIBind will enable FastCGI mode if set to a bind address
+	ConfFCGIBind = "FASTCGI_BIND"
 )
 
 // SetEnvPrefix sets the environment prefix for configuration

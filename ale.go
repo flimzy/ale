@@ -7,6 +7,7 @@ import (
 
 	"github.com/dimfeld/httptreemux"
 	"github.com/flimzy/log"
+	"github.com/pkg/errors"
 	"github.com/tylerb/graceful"
 )
 
@@ -56,6 +57,9 @@ func New() *Server {
 
 // Run initializes the web server instance
 func (s *Server) Run() error {
+	if s.GetConf(ConfFCGIBind) != "" {
+		return s.FastCGI()
+	}
 	httpAddr := s.GetConf(ConfHTTPBind)
 	httpsAddr := s.GetConf(ConfHTTPSBind)
 
@@ -68,4 +72,13 @@ func (s *Server) Run() error {
 		return s.serveHTTP(httpAddr)
 	}
 	return s.serveHTTPS(httpsAddr)
+}
+
+// FastCGI binds to the FastCGI port
+func (s *Server) FastCGI() error {
+	fcgiAddr := s.GetConf(ConfFCGIBind)
+	if fcgiAddr == "" {
+		return errors.Errorf("%s_%s not set.", s.EnvPrefix(), ConfFCGIBind)
+	}
+	return s.serveFastCGI(fcgiAddr)
 }
