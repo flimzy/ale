@@ -68,6 +68,7 @@ func (s *Server) Render(w ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.renderTemplate(w, r); err != nil {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Error executing template: %s\n", err)
 	}
