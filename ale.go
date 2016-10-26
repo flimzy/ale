@@ -18,6 +18,19 @@ type View struct {
 	FuncMap  map[string]interface{}
 }
 
+// Copy makes a deep copy of a View
+func (v *View) Copy() *View {
+	nv := &View{
+		View:     v.View,
+		Template: v.Template,
+		FuncMap:  make(map[string]interface{}),
+	}
+	for k, v := range v.FuncMap {
+		nv.FuncMap[k] = v
+	}
+	return nv
+}
+
 // Timeout defines the default time to wait before killing active connections on shutdown or restart.
 const Timeout = 10 * time.Second
 

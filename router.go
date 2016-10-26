@@ -54,10 +54,7 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	stash["template"] = s.View.Template
 	stash["req"] = req
 	ctx = context.WithValue(ctx, StashContextKey, stash)
-
-	view := &View{}
-	*view = *s.View // make a copy
-	ctx = context.WithValue(ctx, ViewContextKey, view)
+	ctx = context.WithValue(ctx, ViewContextKey, s.View.Copy())
 
 	r := req.WithContext(ctx)
 	w := &response{rw, false}
