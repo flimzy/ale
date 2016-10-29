@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/oxtoacart/bpool"
 	"github.com/pkg/errors"
@@ -34,32 +36,91 @@ func putBuf(b *bytes.Buffer) {
 	bufpool.Put(b)
 }
 
+type pageTemplate struct {
+	filename string
+	server   *Server
+	lastRead time.Time
+	template *template.Template
+}
+
+var pageTemplates = make(map[string]*pageTemplate)
+
+const pageCacheTime = 15 * time.Second
+
+func (s *Server) newPageTemplate(filename string) *pageTemplate {
+	return &pageTemplate{
+		filename: filename,
+		server:   s,
+	}
+}
+
+func (s *Server) getPageTemplate(name string) *pageTemplate {
+	filename := s.TemplateDir + "/" + name
+	p, ok := pageTemplates[filename]
+	if !ok {
+		p = s.newPageTemplate(filename)
+		pageTemplates[filename] = p
+	}
+	return p
+}
+
+func (p *pageTemplate) read() error {
+	if !p.shouldRead() {
+		return nil
+	}
+	log.Printf("Reading template `%s`\n", p.filename)
+	t := template.New("")
+	if fm := p.server.View.FuncMap; fm != nil {
+		t.Funcs(fm)
+	}
+	if _, err := t.ParseFiles(p.filename); err != nil {
+		return errors.Wrapf(err, "Cannot read template '%s'", p.filename)
+	}
+	libPath := p.server.TemplateDir + "/lib"
+	if _, err := os.Stat(libPath); err != nil && !os.IsNotExist(err) {
+		return errors.Wrapf(err, "Unable to read templates lib `%s`", libPath)
+	} else if err == nil {
+		_, err := t.ParseGlob(libPath + "/*")
+		if err != nil {
+			return errors.Wrapf(err, "Error parsing templates in '%s'", libPath)
+		}
+	}
+	// Only set the template if there's no error. This allows us to keep using
+	// an old template if an error is introduced.
+	p.template = t
+	p.lastRead = time.Now()
+	return nil
+}
+
+func (p *pageTemplate) shouldRead() bool {
+	if p.template == nil {
+		return true
+	}
+	if time.Now().Sub(p.lastRead) < pageCacheTime {
+		// Only check the mtime after dictionaryCacheTime
+		return false
+	}
+	// I ignore errors here, as any failure will either re-surface
+	// when we actually try to read the file, or it was transient
+	info, _ := os.Stat(p.filename)
+	if info.ModTime().After(p.lastRead) {
+		return true
+	}
+	return false
+}
+
 func (s *Server) template(name string) (*template.Template, error) {
 	if s.TemplateDir == "" {
 		return nil, errors.Errorf("No TemplateDir specified")
 	}
-	tmplFile := s.TemplateDir + "/" + name
-	if _, err := os.Stat(tmplFile); err != nil {
-		return nil, errors.Wrapf(err, "Unable to read requested template `%s'", tmplFile)
-	}
-	t := template.New("")
-	if s.View.FuncMap != nil {
-		t = t.Funcs(s.View.FuncMap)
-	}
-	_, err := t.ParseFiles(tmplFile)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Unable to parse template '%s'", tmplFile)
-	}
-	libPath := s.TemplateDir + "/lib"
-	if _, err := os.Stat(libPath); err != nil && !os.IsNotExist(err) {
-		return nil, errors.Wrapf(err, "Unable to read templates lib `%s`", libPath)
-	} else if err == nil {
-		_, err := t.ParseGlob(libPath + "/*")
-		if err != nil {
-			return nil, errors.Wrapf(err, "Error parsing templates in '%s'", libPath)
+	t := s.getPageTemplate(name)
+	if err := t.read(); err != nil {
+		if t.template == nil {
+			return nil, err
 		}
+		log.Printf("Error refreshing template '%s': %s\n", name, err.Error())
 	}
-	return t, nil
+	return t.template, nil
 }
 
 // Render renders the page
