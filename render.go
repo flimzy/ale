@@ -70,9 +70,7 @@ func (p *pageTemplate) read() error {
 	}
 	log.Printf("Reading template `%s`\n", p.filename)
 	t := template.New("")
-	if fm := p.server.View.FuncMap; fm != nil {
-		t.Funcs(fm)
-	}
+	t.Funcs(p.server.View.GetFuncMap())
 	if _, err := t.ParseFiles(p.filename); err != nil {
 		return errors.Wrapf(err, "Cannot read template '%s'", p.filename)
 	}
@@ -150,9 +148,7 @@ func (s *Server) renderTemplate(w ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if view.FuncMap != nil {
-		t.Funcs(view.FuncMap)
-	}
+	t.Funcs(view.GetFuncMap())
 	buf := getBuf()
 	defer putBuf(buf)
 	if err := t.ExecuteTemplate(buf, tmplName, GetStash(r)); err != nil {

@@ -31,6 +31,35 @@ func (v *View) Copy() *View {
 	return nv
 }
 
+var defaultFuncMap = map[string]interface{}{
+	"makeMap": makeMap,
+}
+
+func makeMap(args ...interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+	for {
+		if len(args) == 0 {
+			return result
+		}
+		key, _ := args[0].(string)
+		value := args[1]
+		args = args[2:]
+		result[key] = value
+	}
+}
+
+// GetFuncMap returns a compiled FuncMap
+func (v *View) GetFuncMap() template.FuncMap {
+	fm := make(template.FuncMap)
+	for k, v := range defaultFuncMap {
+		fm[k] = v
+	}
+	for k, v := range v.FuncMap {
+		fm[k] = v
+	}
+	return fm
+}
+
 // Timeout defines the default time to wait before killing active connections on shutdown or restart.
 const Timeout = 10 * time.Second
 
