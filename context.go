@@ -6,12 +6,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dimfeld/httptreemux"
 	"github.com/pkg/errors"
 )
 
 // ParamsContextKey is the key used to fetch URL paramaters from r.Context()
-const ParamsContextKey = httptreemux.ParamsContextKey
+const ParamsContextKey = 0 // copied from https://github.com/dimfeld/httptreemux/blob/master/context.go#L123
 
 // StashContextKey is the key used to fetch the stash from r.Context()
 const StashContextKey = "🍺.stash"
